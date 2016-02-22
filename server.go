@@ -19,13 +19,22 @@ func setUpBuckets(db *bolt.DB){
     })
 }
 
-func main() {
+func OpenDb() *bolt.DB {
     db, err := bolt.Open("my.db", 0644, &bolt.Options{Timeout: 1 * time.Second})
     if err != nil {
         log.Fatal(err)
     }
     
-    defer db.Close()
+    return db
+}
+
+func CloseDb(db *bolt.DB) {
+    db.Close()
+}
+
+func main() {
+    db := OpenDb()
+    
     setUpBuckets(db)
     
     r := mux.NewRouter()
@@ -48,6 +57,7 @@ func main() {
         Methods("GET")
     
 
+    CloseDb(db)
     fmt.Println("Server is up and running on localhost:8000")    
     // Bind to a port and pass our router in
     // Nothing will run past this

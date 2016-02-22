@@ -19,8 +19,8 @@ type Tokens struct {
     Created time.Time
 }
 
-func (list *List) AddPerson(person Person) []Person {
-    list.People = append(list.People, person)
+func (list *List) AddPerson(person *Person) []Person {
+    list.People = append(list.People, *person)
     return list.People
 }
 
