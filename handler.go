@@ -3,12 +3,10 @@ package main
 import(
     "net/http"
     "log"
-    "time"
     "fmt"
-    "encoding/json"
-    "github.com/gorilla/schema"
-    "github.com/nu7hatch/gouuid"
-    "github.com/boltdb/bolt"
+    "time"
+    "github.com/gorilla/mux"
+    "github.com/gorilla/schema"   
 )
 
 func Ping(w http.ResponseWriter, r *http.Request) {
@@ -16,11 +14,59 @@ func Ping(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetNextFika (w http.ResponseWriter, r *http.Request) {
-    w.Write([]byte("Ping!\n"))
+    list := new(List)
+    list, err := FetchList()
+    
+    if err != nil {
+        http.Error(w, "Failed to fetch list", http.StatusInternalServerError)
+        return
+    }
+    
+    var fika Person
+    highest := time.Time{}
+    
+    for i := len(list.People) - 1; i >= 0; i-- {
+        current := list.People[i]
+        fmt.Printf("Comparing (%s) %s (current) with %s (highest) \n", current.Name, current.FikaTimeStamp.String(), highest.String())
+        if err != nil {
+            // Do something
+        }
+        
+        if !current.FikaTimeStamp.After(highest) {
+            fika = current
+        }
+    }
+    
+    json, err := fika.ToJSON()
+    
+    w.Header().Set("Content-Type", "application/json")
+    w.Write(json)
 }
 
 func CompletedFika(w http.ResponseWriter, r *http.Request) {
-    w.Write([]byte("Ping!\n"))
+    vars := mux.Vars(r)
+    name := vars["name"]
+    if len(name) <= 0 {
+        http.Error(w, "Missing name in url", http.StatusBadRequest)
+        return
+    }
+    
+    // Should probably check that we have one first
+    // Also we create a new empty object to database sometimes. "Fun"
+    
+    target, err := GetOne(name)
+    target.FikaTimeStamp = time.Now()
+    target.Save()
+
+    if err != nil {
+        http.Error(w, "Missing name in url", http.StatusBadRequest)
+        return
+    }
+    
+    js, err := target.ToJSON()
+    
+    w.Header().Set("Content-Type", "application/json")
+    w.Write(js)
 }
 
 func NewUser(w http.ResponseWriter, r *http.Request) {
@@ -39,96 +85,81 @@ func NewUser(w http.ResponseWriter, r *http.Request) {
         return
     }
     
-    id, err := uuid.NewV4()
     if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
-    
-    db := OpenDb()    
-    list := new(List)
-    
-    err = db.View(func(tx *bolt.Tx) error {
-        b := tx.Bucket([]byte("Fika"))
-        v := b.Get([]byte("List"))
-        
-        err := json.Unmarshal(v, &list)
-        
-        if err != nil {
-            // Do something
-        }
-        
-        return nil
-    })
-    
-    person.ID = id.String()
-    person.FikaTimeStamp = time.Time{}
-    list.AddPerson(person)
-    
-    js, err := json.Marshal(person)
-    
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+        http.Error(w, "Failed to fetch list", http.StatusInternalServerError)
         return
     }
-    err = db.Update(func(tx *bolt.Tx) error {
-        b, err := tx.CreateBucketIfNotExists([]byte("Fika"))
-        if err != nil {
-            return fmt.Errorf("Create bucket: %s", err)
-        }
-        encoded, err := json.Marshal(list)
-        err = b.Put([]byte("List"), encoded)
-        
-        if err != nil {
-            return fmt.Errorf("Error inserting data: %s", err)
-        }
-        return nil
-    })
+
+    err = person.Initialize()
     
     if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+        http.Error(w, "Failed to initiate person", http.StatusInternalServerError)
         return
     }
     
-    CloseDb(db)
+    // list.AddPerson(person)
+    // list.Save()
+    person.Save()
+    
+    js, err := person.ToJSON()
     
     w.Header().Set("Content-Type", "application/json")
     w.Write(js)
 }   
 
-func RemoveUser(w http.ResponseWriter, r *http.Request) {
-    w.Write([]byte("Ping!\n"))
+func RemoveUser(w http.ResponseWriter, r *http.Request) {    
+    vars := mux.Vars(r)
+    name := vars["name"]
+    if len(name) <= 0 {
+        http.Error(w, "Missing name in url", http.StatusBadRequest)
+        return
+    }
+    
+    RemoveOne(name)    
+    w.Header().Set("Content-Type", "application/json")
+    w.Write([]byte("Successfully deleted " + name))
 }
 
 func GetAllUsers(w http.ResponseWriter, r *http.Request) {
-    db := OpenDb()
     list := new(List)
+    list, err := FetchList()
     
-    err := db.View(func(tx *bolt.Tx) error {
-        b := tx.Bucket([]byte("Fika"))
-        v := b.Get([]byte("List"))
-        
-        err := json.Unmarshal(v, &list)
-        
-        if err != nil {
-            // Do something
-        }
-        
-        return nil
-    })
+    if err != nil {
+        http.Error(w, "Failed to fetch list", http.StatusInternalServerError)
+    }
+    
+    json := list.ToJSON()
     
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
     
-    encoded, err := json.Marshal(list)
-    
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-    
-    CloseDb(db)
     w.Header().Set("Content-Type", "application/json")
-    w.Write(encoded)
+    w.Write(json)
+}
+
+func GetOneUser(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    name := vars["name"]
+    if len(name) <= 0 {
+        http.Error(w, "Missing name in url", http.StatusBadRequest)
+        return
+    }
+    
+    p, err := GetOne(name)
+    
+    if err != nil {
+        http.Error(w, "Failed to fetch list", http.StatusInternalServerError)
+    }
+    
+    json, err := p.ToJSON()
+    
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    
+    w.Header().Set("Content-Type", "application/json")
+    w.Write(json)
 }

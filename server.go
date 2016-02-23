@@ -34,30 +34,37 @@ func CloseDb(db *bolt.DB) {
 
 func main() {
     db := OpenDb()
-    
     setUpBuckets(db)
+    CloseDb(db)    
     
     r := mux.NewRouter()
     // Routes consist of a path and a handler function.
-    r.HandleFunc("/ping", Ping)
+    r.HandleFunc("/ping", GetOneUser)
     
-    r.HandleFunc("/fika", GetNextFika).
-        Methods("GET")
+    r.Path("/fika").
+        Methods("GET").
+        HandlerFunc(GetNextFika)
         
-    r.HandleFunc("/fika", CompletedFika).
-        Methods("PUT")
+    r.Path("/fika/{name}").
+        Methods("PUT").
+        HandlerFunc(CompletedFika)
         
-    r.HandleFunc("/user", NewUser).
-        Methods("POST")
+    r.Path("/user").
+        Methods("POST").
+        HandlerFunc(NewUser)
         
-    r.HandleFunc("/user", RemoveUser).
-        Methods("DELETE")
-        
-    r.HandleFunc("/user", GetAllUsers).
-        Methods("GET")
+    r.Path("/user").
+        Methods("GET").
+        HandlerFunc(GetAllUsers)
     
-
-    CloseDb(db)
+    r.Path("/user/{name}").
+        Methods("GET").
+        HandlerFunc(GetOneUser)
+    
+    r.Path("/user/{name}").
+        Methods("DELETE").
+        HandlerFunc(RemoveUser)
+        
     fmt.Println("Server is up and running on localhost:8000")    
     // Bind to a port and pass our router in
     // Nothing will run past this
