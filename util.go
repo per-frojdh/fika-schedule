@@ -12,7 +12,7 @@ func Equals(a string, b string) bool {
     return strings.ToLower(a) == strings.ToLower(b) 
 }
 
-// My own time wrapper
+// My own time wrapper (this doesnt work :()
 type Timestamp time.Time
 func (t Timestamp) MarshalJSON() ([]byte, error) {
     fmt.Printf("Marshalling to JSON: \n %s", t.ToString())

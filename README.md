@@ -43,7 +43,17 @@ Note that this is definitely not *the* way to go about this. It's more along a q
     * Unmarshal the JSON(or is it bytes?) into structs that we can read, write, manipulate etc.
     * Marshal the struct into JSON that we can return to the user.
 
+### File structure
+```
+database.go -> Database related stuff, open/close connections and basic functions.
+handler.go -> API handlers, this is where the magic happens.
+server.go -> Entry point, maps the handlers to the URLs.
+structs.go -> This is where our structs live, contains a lot of static methods.
+util.go -> Failed attempts at interfacing timestamps (and other additional methods)
+```
+
 ## What's left to do
+* Documentation (and comments)
 * Error handling is a mess, but that's mostly cause nothing is validated.
 * Database handling needs to get improved, occasionally we get locked out of file access.
 * Cleaning up the structs and objects.
